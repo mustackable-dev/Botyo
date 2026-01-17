@@ -78,7 +78,7 @@ Main endpoints:
 - `PATCH /Notifications/{id}/Stop` – Disable notification
 - `POST /Notifications/{id}/Run` – Run immediately
 
-All scheduling is done using **Cron expressions**.
+All scheduling is done using cron expressions with **UTC time**!
 
 ## Tech Stack
 
