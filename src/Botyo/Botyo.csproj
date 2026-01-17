@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <RootNamespace>Botyo</RootNamespace>
+        <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <EmbeddedResource Include="Scripts/**/*.sql" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="BackgroundNinja" Version="1.0.0" />
+        <PackageReference Include="Cronos" Version="0.11.1" />
+        <PackageReference Include="dbup-sqlite" Version="6.0.4" />
+        <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.2" />
+        <PackageReference Include="Swashbuckle.AspNetCore" Version="10.1.0" />
+        <PackageReference Include="Ormamu" Version="1.0.0.2" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Content Include="..\..\docs\readme.md">
+        <Link>readme.md</Link>
+      </Content>
+    </ItemGroup>
+
+</Project>

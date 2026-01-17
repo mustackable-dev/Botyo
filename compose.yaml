@@ -1,0 +1,16 @@
+﻿services:
+  botyo:
+    image: botyo:latest
+    container_name: botyo
+    ports:
+      - "55421:8080"
+    environment:
+      ApiKey: ${ApiKey}
+      Discord__WebHook: ${Discord__WebHook}
+    volumes:
+      - botyo_data:/data
+    restart: unless-stopped
+
+volumes:
+  botyo_data:
+    driver: local
