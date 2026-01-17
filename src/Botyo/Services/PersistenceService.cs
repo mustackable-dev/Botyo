@@ -7,7 +7,7 @@ using Ormamu;
 
 namespace Botyo.Services;
 
-public class PersistenceService(ILogger<PersistenceService> logger)
+public class PersistenceService()
 {
     public static string ConnectionString { get; set; } = null!;
     private static IDbConnection GetConnection()

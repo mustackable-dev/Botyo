@@ -1,7 +1,10 @@
 using Botyo.Extensions;
 using Botyo.Middleware;
+using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.ConfigureLogging();
 
 builder.Services
     .AddSwagger()
@@ -28,6 +31,6 @@ if (app.IsConfigurationValid())
 }
 else
 {
-    Console.WriteLine("Please make sure you have configured your webhook URL as an environment variable before " +
+    Log.Error("Please make sure you have configured your webhook URL as an environment variable before " +
                       "starting the service. The service will terminate now.");
 }

@@ -7,6 +7,7 @@ using DbUp.Engine;
 using Botyo.Services;
 using Microsoft.OpenApi;
 using Ormamu;
+using Serilog;
 
 namespace Botyo.Extensions;
 
@@ -16,6 +17,11 @@ public static class ConfigurationExtensions
     {
         services.AddSwaggerGen(x =>
         {
+            x.SwaggerDoc("v1", new OpenApiInfo
+            {
+                Title = "Botyo",
+                Version = Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "",
+            });
             x.AddSecurityDefinition("ApiKey", new OpenApiSecurityScheme
             {
                 Type = SecuritySchemeType.ApiKey,
@@ -66,7 +72,7 @@ public static class ConfigurationExtensions
             app.Environment.IsDevelopment() ? AppContext.BaseDirectory : "/data",
             "persistence.db")}\"";
         
-        Console.WriteLine($"Connecting to database {PersistenceService.ConnectionString}");
+        Log.Information("Connecting to database {0}", PersistenceService.ConnectionString);
         
         SQLitePCL.Batteries.Init();              
         UpgradeEngine engine =
@@ -81,13 +87,13 @@ public static class ConfigurationExtensions
 
         if (!result.Successful)
         {
-            Console.WriteLine(
-                $"Error occured when applying script {result.ErrorScript.Name} on persistence layer " +
-                $"with content:\n\n{result.ErrorScript.Contents}");
+            Log.Fatal(result.Error, "Error occured when applying script " +
+                                    "{ScriptName} on persistence layer with content:\n\n" +
+                                    "{Contents}", result.ErrorScript.Name, result.ErrorScript.Contents);
             throw result.Error;
         }
 
-        Console.WriteLine("Schema deploy successful!");
+        Log.Information("Schema deploy successful!");
         
         return app;
     }
@@ -102,4 +108,9 @@ public static class ConfigurationExtensions
 
         return services;
     }
+
+    public static void ConfigureLogging(this WebApplicationBuilder builder)
+        => builder.Host.UseSerilog((_, loggerConfiguration) => loggerConfiguration
+            .WriteTo.Console()
+            .ReadFrom.Configuration(builder.Configuration));
 }
