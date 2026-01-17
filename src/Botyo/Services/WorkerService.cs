@@ -50,7 +50,7 @@ public class WorkerService : IHostedService
             {
                 if(!notification.Active) continue;
                 
-                DateTime? nextOccurence = notification.Schedule.GetNextOccurrence(baseTimestamp, true);
+                DateTime? nextOccurence = notification.Schedule.GetNextOccurrence(baseTimestamp);
                 if (nextOccurence is not null)
                 {
                     if (earliestNotification is null || nextOccurence < earliestNotification)
