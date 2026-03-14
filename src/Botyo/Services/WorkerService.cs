@@ -41,29 +41,32 @@ public class WorkerService : IHostedService
 
     private async Task RunScheduledNotifications(CancellationToken cancellationToken)
     {
+        DateTime? earliestNotification = DateTime.UtcNow;
         do
         {
-            DateTime baseTimestamp = DateTime.UtcNow;
-            DateTime? earliestNotification = null;
+            DateTime baseTimestamp = earliestNotification.Value;
+            earliestNotification = null;
             List<int> notificationIdsToRun = [];
             foreach (ScheduledNotification notification in Cache.Values)
             {
-                if(!notification.Active) continue;
+                if(!notification.Active)
+                    continue;
                 
                 DateTime? nextOccurence = notification.Schedule.GetNextOccurrence(baseTimestamp);
-                if (nextOccurence is not null)
+                
+                if (nextOccurence is null)
+                    continue;
+                
+                if (earliestNotification is null || nextOccurence < earliestNotification)
                 {
-                    if (earliestNotification is null || nextOccurence < earliestNotification)
+                    notificationIdsToRun = [notification.Id];
+                    earliestNotification = nextOccurence.Value;
+                }
+                else
+                {
+                    if (nextOccurence == earliestNotification)
                     {
-                        notificationIdsToRun = [notification.Id];
-                        earliestNotification = nextOccurence.Value;
-                    }
-                    else
-                    {
-                        if (nextOccurence == earliestNotification)
-                        {
-                            notificationIdsToRun.Add(notification.Id);
-                        }
+                        notificationIdsToRun.Add(notification.Id);
                     }
                 }
             }
