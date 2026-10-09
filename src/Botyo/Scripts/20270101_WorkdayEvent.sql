@@ -1,0 +1,1 @@
+ALTER TABLE Notifications ADD COLUMN WorkdayOnly integer DEFAULT 0 NOT NULL;

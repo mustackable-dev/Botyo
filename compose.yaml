@@ -1,6 +1,8 @@
 ﻿services:
   botyo:
     image: botyo:latest
+    build:
+      dockerfile: Dockerfile
     container_name: botyo
     ports:
       - "55421:8080"

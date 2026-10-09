@@ -11,4 +11,5 @@ public record Notification
     public required string Content { get; set; }
     public required string Cron {get; set;}
     public bool Active {get; set;}
+    public bool WorkdayOnly { get; set; }
 }

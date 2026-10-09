@@ -12,7 +12,7 @@ public class WorkerService : IHostedService
     private CancellationTokenSource? ServiceTokenSource { get; set; }
     private Task? ServiceTask { get; set; }
     public bool IsRunning() => ServiceTask is not null;
-    private SemaphoreSlim RebuildLock { get; } = new (1, 1);
+    private SemaphoreSlim RebuildLock { get; } = new(1, 1);
     private ConcurrentDictionary<int, ScheduledNotification> Cache { get; }
 
     public WorkerService(
@@ -23,10 +23,11 @@ public class WorkerService : IHostedService
         _scopeFactory = scopeFactory;
         Cache = BuildCache();
     }
+
     public Task StartAsync(CancellationToken cancellationToken)
     {
         if (Cache.IsEmpty) return Task.CompletedTask;
-        
+
         ServiceTokenSource = new();
         ServiceTask = RunScheduledNotificationsAsync(ServiceTokenSource.Token);
         return Task.CompletedTask;
@@ -37,28 +38,28 @@ public class WorkerService : IHostedService
         if (ServiceTokenSource is null) return;
         await ServiceTokenSource.CancelAsync();
         ServiceTask = null;
+        foreach (ScheduledNotification notification in Cache.Values)
+                notification.OccurenceQueue.Clear();
     }
 
     private async Task RunScheduledNotificationsAsync(CancellationToken cancellationToken)
     {
-        DateTime? earliestNotification = DateTime.UtcNow;
+        DateTimeOffset? earliestNotification = DateTime.UtcNow;
         do
         {
-            DateTime baseTimestamp = earliestNotification.Value;
+            DateTimeOffset start = earliestNotification.Value;
             earliestNotification = null;
             List<int> notificationIdsToRun = [];
             foreach (ScheduledNotification notification in Cache.Values)
             {
-                if(!notification.Active)
+                if (!notification.Active)
                     continue;
-                
-                DateTime? nextOccurence = notification.Schedule.GetNextOccurrence(baseTimestamp);
-                
+
+                DateTimeOffset? nextOccurence = GetNextNotificationOccurence(start, notification);
+
                 if (nextOccurence is null)
                     continue;
-                
-                
-                
+
                 if (earliestNotification is null || nextOccurence < earliestNotification)
                 {
                     notificationIdsToRun = [notification.Id];
@@ -74,24 +75,25 @@ public class WorkerService : IHostedService
             }
 
             TimeSpan delay = earliestNotification!.Value - DateTime.UtcNow;
-            
-            _logger.LogInformation("Worker service delay: {0} ms, will run tasks: {1}", delay.TotalMilliseconds,
+
+            _logger.LogInformation(
+                "Worker service delay: {0} ms, will run tasks: {1}",
+                delay.TotalMilliseconds,
                 string.Join(',', notificationIdsToRun.Select(x => x.ToString()).ToArray()));
-            
+
             await Task.Delay(delay, cancellationToken);
-            
+
             using IServiceScope scope = _scopeFactory.CreateScope();
             IDispatchService dispatchService = scope.ServiceProvider.GetRequiredService<IDispatchService>();
-            
+
             foreach (int notificationId in notificationIdsToRun)
             {
-                if(Cache.TryGetValue(notificationId, out ScheduledNotification? notification))
+                if (Cache.TryGetValue(notificationId, out ScheduledNotification? notification))
                 {
                     _ = dispatchService.DispatchNotificationAsync(notification, cancellationToken);
                 }
             }
-        }
-        while (!cancellationToken.IsCancellationRequested);
+        } while (!cancellationToken.IsCancellationRequested);
     }
 
     private ConcurrentDictionary<int, ScheduledNotification> BuildCache()
@@ -99,13 +101,15 @@ public class WorkerService : IHostedService
         using IServiceScope scope = _scopeFactory.CreateScope();
         PersistenceService persistenceService = scope.ServiceProvider.GetRequiredService<PersistenceService>();
         IEnumerable<ScheduledNotification> notifications = persistenceService.GetNotificationsAsync()
-                                                            .Result
-                                                            .Select(x=>x.ToScheduledNotification());
-        
+            .Result
+            .Select(x => x.ToScheduledNotification());
+
         return new(notifications.Select(x => new KeyValuePair<int, ScheduledNotification>(x.Id, x)));
     }
 
-    public async Task AddScheduledNotificationAsync(ScheduledNotification notification, CancellationToken cancellationToken=default)
+    public async Task AddScheduledNotificationAsync(
+        ScheduledNotification notification,
+        CancellationToken cancellationToken = default)
     {
         if (Cache.TryAdd(notification.Id, notification))
         {
@@ -113,15 +117,19 @@ public class WorkerService : IHostedService
         }
     }
 
-    public async Task ReplaceScheduledNotificationAsync(ScheduledNotification notification, CancellationToken cancellationToken=default)
+    public async Task ReplaceScheduledNotificationAsync(
+        ScheduledNotification notification,
+        CancellationToken cancellationToken = default)
     {
-        if(Cache.TryUpdate(notification.Id, notification, Cache[notification.Id]))
+        if (Cache.TryUpdate(notification.Id, notification, Cache[notification.Id]))
         {
             await RebuildWorkerAsync(cancellationToken);
         }
     }
 
-    public async Task DeleteScheduledNotificationAsync(int notificationId, CancellationToken cancellationToken=default)
+    public async Task DeleteScheduledNotificationAsync(
+        int notificationId,
+        CancellationToken cancellationToken = default)
     {
         if (Cache.TryRemove(notificationId, out _))
         {
@@ -129,11 +137,38 @@ public class WorkerService : IHostedService
         }
     }
 
-    private async Task RebuildWorkerAsync(CancellationToken cancellationToken=default)
+    private async Task RebuildWorkerAsync(CancellationToken cancellationToken = default)
     {
         await RebuildLock.WaitAsync(cancellationToken);
         await StopAsync(CancellationToken.None);
         await StartAsync(CancellationToken.None);
         RebuildLock.Release();
+    }
+
+    private static DateTimeOffset? GetNextNotificationOccurence(
+        DateTimeOffset baseline,
+        ScheduledNotification notification)
+    {
+        DateTimeOffset? nextOccurence = notification.OccurenceQueue.TryDequeue(out DateTimeOffset result)
+            ? result
+            : CalculateNextOccurence(baseline, notification);
+        
+        if (nextOccurence is not null &&
+            CalculateNextOccurence(nextOccurence.Value, notification) is { } queuedOccurence)
+            notification.OccurenceQueue.Enqueue(queuedOccurence);
+
+        return nextOccurence;
+    }
+
+    private static DateTimeOffset? CalculateNextOccurence(DateTimeOffset baseline, ScheduledNotification notification)
+    {
+        DateTimeOffset? result = notification.Schedule.GetNextOccurrence(baseline, TimeZoneInfo.Utc);
+        if (!notification.WorkdayOnly || result is null)
+            return result;
+
+        while (result.Value.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday)
+            result = result.Value.AddDays(1);
+
+        return result;
     }
 }

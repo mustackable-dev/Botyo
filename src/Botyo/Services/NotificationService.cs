@@ -11,11 +11,11 @@ public class NotificationService(
     WorkerService workerService,
     IDispatchService dispatchService)
 {
-    public async Task<Result<Notification>> CreateNotificationAsync(NotificationCreateRequest notification, CancellationToken cancellationToken = default)
+    public async Task<Result<Notification>> CreateNotificationAsync(NotificationUpsertRequest request, CancellationToken cancellationToken = default)
     {
         try
         {
-            CronExpression.Parse(notification.Cron);
+            CronExpression.Parse(request.Cron);
         }
         catch (CronFormatException exception)
         {
@@ -25,8 +25,9 @@ public class NotificationService(
         Notification persistedNotification = await persistence.CreateNotificationAsync(new ()
         {
             Active = true,
-            Content = notification.Content,
-            Cron = notification.Cron
+            WorkdayOnly = request.WorkdayOnly,
+            Content = request.Content,
+            Cron = request.Cron
         });
         
         await workerService.AddScheduledNotificationAsync(persistedNotification.ToScheduledNotification(), cancellationToken);
@@ -49,11 +50,11 @@ public class NotificationService(
     public async Task<Result<IEnumerable<Notification>>> GetAllNotificationsAsync()
         => Result<IEnumerable<Notification>>.Success(StatusCodes.Status200OK, await persistence.GetNotificationsAsync());
     
-    public async Task<Result<Notification>> UpdateNotificationAsync(int id, NotificationUpdateRequest notificationUpdate, CancellationToken cancellationToken = default)
+    public async Task<Result<Notification>> UpdateNotificationAsync(int id, NotificationUpsertRequest request, CancellationToken cancellationToken = default)
     {
         try
         {
-            CronExpression.Parse(notificationUpdate.Cron);
+            CronExpression.Parse(request.Cron);
         }
         catch (CronFormatException exception)
         {
@@ -67,9 +68,10 @@ public class NotificationService(
         Notification updatedNotification = await persistence.UpdateNotificationAsync(new ()
         {
             Id = id,
-            Active = notificationUpdate.Active,
-            Content = notificationUpdate.Content,
-            Cron = notificationUpdate.Cron
+            WorkdayOnly = request.WorkdayOnly,
+            Active = request.Active,
+            Content = request.Content,
+            Cron = request.Cron
         });
         
         await workerService.ReplaceScheduledNotificationAsync(updatedNotification.ToScheduledNotification(), cancellationToken);

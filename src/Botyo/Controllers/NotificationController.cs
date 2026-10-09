@@ -13,7 +13,7 @@ public class NotificationController(
     [HttpPost]
     [ProducesResponseType<Notification>(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> CreateNotification(NotificationCreateRequest notification, CancellationToken cancellationToken = default)
+    public async Task<IActionResult> CreateNotification(NotificationUpsertRequest notification, CancellationToken cancellationToken = default)
     {
         Result<Notification> result = await notificationService.CreateNotificationAsync(notification, cancellationToken);
 
@@ -35,8 +35,8 @@ public class NotificationController(
     [ProducesResponseType<Notification>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> UpdateNotification(int id, NotificationUpdateRequest notification, CancellationToken cancellationToken=default)
-        => FromResult(await notificationService.UpdateNotificationAsync(id, notification, cancellationToken));
+    public async Task<IActionResult> UpdateNotification(int id, NotificationUpsertRequest request, CancellationToken cancellationToken=default)
+        => FromResult(await notificationService.UpdateNotificationAsync(id, request, cancellationToken));
 
     [HttpGet]
     [ProducesResponseType<Notification>(StatusCodes.Status201Created)]

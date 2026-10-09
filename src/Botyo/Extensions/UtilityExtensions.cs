@@ -13,6 +13,7 @@ public static class UtilityExtensions
             Content = notification.Content,
             Cron = notification.Cron,
             Active = notification.Active,
+            WorkdayOnly = notification.WorkdayOnly,
             Schedule = CronExpression.Parse(notification.Cron)
         };
 }
