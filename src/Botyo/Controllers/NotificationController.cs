@@ -13,9 +13,9 @@ public class NotificationController(
     [HttpPost]
     [ProducesResponseType<Notification>(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> CreateNotification(NotificationDto notification)
+    public async Task<IActionResult> CreateNotification(NotificationCreateRequest notification, CancellationToken cancellationToken = default)
     {
-        Result<Notification> result = await notificationService.CreateNotification(notification);
+        Result<Notification> result = await notificationService.CreateNotificationAsync(notification, cancellationToken);
 
         if (!workerService.IsRunning())
         {
@@ -25,46 +25,40 @@ public class NotificationController(
         return FromResult(result);
     }
     
-    [HttpPost("{id}/Run")]
+    [HttpPost("{id:int}/Run")]
     [ProducesResponseType<Notification>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> RunNotification(int id)
-        => FromResult(await notificationService.RunNotificationManually(id));
+    public async Task<IActionResult> RunNotification(int id, CancellationToken cancellationToken=default)
+        => FromResult(await notificationService.RunNotificationManuallyAsync(id, cancellationToken));
     
-    [HttpPut("{id}")]
+    [HttpPut("{id:int}")]
     [ProducesResponseType<Notification>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> UpdateNotification(int id, NotificationUpdateDto notification)
-        => FromResult(await notificationService.UpdateNotification(id, notification));
+    public async Task<IActionResult> UpdateNotification(int id, NotificationUpdateCreateRequest notification, CancellationToken cancellationToken=default)
+        => FromResult(await notificationService.UpdateNotificationAsync(id, notification, cancellationToken));
 
     [HttpGet]
     [ProducesResponseType<Notification>(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> GetAllNotifications()
-        => FromResult(await notificationService.GetAllNotifications());
+        => FromResult(await notificationService.GetAllNotificationsAsync());
     
-    [HttpGet("{id}")]
+    [HttpGet("{id:int}")]
     [ProducesResponseType<Notification>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetNotification(int id)
-        => FromResult(await notificationService.GetNotification(id));
+        => FromResult(await notificationService.GetNotificationAsync(id));
     
-    [HttpPatch("{id}/Start")]
+    [HttpPatch("{id:int}/active")]
     [ProducesResponseType<Notification>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> StartNotification(int id)
-        => FromResult(await notificationService.ChangeNotificationStatus(id, true));
+    public async Task<IActionResult> SetNotificationActive(int id, SetBooleanRequest request, CancellationToken cancellationToken=default)
+        => FromResult(await notificationService.ChangeNotificationStatusAsync(id, request, cancellationToken));
     
-    [HttpPatch("{id}/Stop")]
-    [ProducesResponseType<Notification>(StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> StopNotification(int id)
-        => FromResult(await notificationService.ChangeNotificationStatus(id, false));
-    
-    [HttpDelete("{id}")]
+    [HttpDelete("{id:int}")]
     [ProducesResponseType<Notification>(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> DeleteNotification(int id)
-        => FromResult(await notificationService.DeleteNotification(id));
+    public async Task<IActionResult> DeleteNotification(int id, CancellationToken cancellationToken=default)
+        => FromResult(await notificationService.DeleteNotificationAsync(id, cancellationToken));
 }

@@ -1,5 +1,8 @@
+using System.Reflection;
+using Botyo.Configuration;
 using Botyo.Extensions;
 using Botyo.Middleware;
+using Microsoft.Extensions.Options;
 using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -9,6 +12,7 @@ builder.ConfigureLogging();
 builder.Services
     .AddSwagger()
     .AddCommonDependencies()
+    .AddBoundConfiguration(builder.Configuration, builder.Environment.IsDevelopment())
     .AddHttpClients(builder.Configuration)
     .AddLogging(x => x.AddConsole())
     .AddControllers()
@@ -24,9 +28,10 @@ if (app.IsConfigurationValid())
         .UseHttpsRedirection();
     app
         .ConfigureOrmamu()
-        .DeploySchema()
+        .DeploySchema(app.Services.GetRequiredService<IOptions<PersistenceConfig>>().Value)
         .MapControllers();
 
+    Log.Information("Running Botyo version {Version}", Assembly.GetExecutingAssembly().GetName().Version);
     await app.RunAsync();
 }
 else

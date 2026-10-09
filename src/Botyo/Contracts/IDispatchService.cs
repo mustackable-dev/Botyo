@@ -4,5 +4,5 @@ namespace Botyo.Contracts;
 
 public interface IDispatchService
 {
-    Task DispatchNotification(Notification notification);
+    Task DispatchNotificationAsync(Notification notification, CancellationToken cancellationToken=default);
 }

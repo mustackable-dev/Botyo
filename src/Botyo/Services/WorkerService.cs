@@ -28,7 +28,7 @@ public class WorkerService : IHostedService
         if (Cache.IsEmpty) return Task.CompletedTask;
         
         ServiceTokenSource = new();
-        ServiceTask = RunScheduledNotifications(ServiceTokenSource.Token);
+        ServiceTask = RunScheduledNotificationsAsync(ServiceTokenSource.Token);
         return Task.CompletedTask;
     }
 
@@ -39,7 +39,7 @@ public class WorkerService : IHostedService
         ServiceTask = null;
     }
 
-    private async Task RunScheduledNotifications(CancellationToken cancellationToken)
+    private async Task RunScheduledNotificationsAsync(CancellationToken cancellationToken)
     {
         DateTime? earliestNotification = DateTime.UtcNow;
         do
@@ -56,6 +56,8 @@ public class WorkerService : IHostedService
                 
                 if (nextOccurence is null)
                     continue;
+                
+                
                 
                 if (earliestNotification is null || nextOccurence < earliestNotification)
                 {
@@ -85,7 +87,7 @@ public class WorkerService : IHostedService
             {
                 if(Cache.TryGetValue(notificationId, out ScheduledNotification? notification))
                 {
-                    _ = dispatchService.DispatchNotification(notification);
+                    _ = dispatchService.DispatchNotificationAsync(notification, cancellationToken);
                 }
             }
         }
@@ -96,40 +98,40 @@ public class WorkerService : IHostedService
     {
         using IServiceScope scope = _scopeFactory.CreateScope();
         PersistenceService persistenceService = scope.ServiceProvider.GetRequiredService<PersistenceService>();
-        IEnumerable<ScheduledNotification> notifications = persistenceService.GetNotifications()
+        IEnumerable<ScheduledNotification> notifications = persistenceService.GetNotificationsAsync()
                                                             .Result
                                                             .Select(x=>x.ToScheduledNotification());
         
         return new(notifications.Select(x => new KeyValuePair<int, ScheduledNotification>(x.Id, x)));
     }
 
-    public async Task AddScheduledNotification(ScheduledNotification notification)
+    public async Task AddScheduledNotificationAsync(ScheduledNotification notification, CancellationToken cancellationToken=default)
     {
         if (Cache.TryAdd(notification.Id, notification))
         {
-            await RebuildWorker();
+            await RebuildWorkerAsync(cancellationToken);
         }
     }
 
-    public async Task ReplaceScheduledNotification(ScheduledNotification notification)
+    public async Task ReplaceScheduledNotificationAsync(ScheduledNotification notification, CancellationToken cancellationToken=default)
     {
         if(Cache.TryUpdate(notification.Id, notification, Cache[notification.Id]))
         {
-            await RebuildWorker();
+            await RebuildWorkerAsync(cancellationToken);
         }
     }
 
-    public async Task DeleteScheduledNotification(int notificationId)
+    public async Task DeleteScheduledNotificationAsync(int notificationId, CancellationToken cancellationToken=default)
     {
         if (Cache.TryRemove(notificationId, out _))
         {
-            await RebuildWorker();
+            await RebuildWorkerAsync(cancellationToken);
         }
     }
 
-    private async Task RebuildWorker()
+    private async Task RebuildWorkerAsync(CancellationToken cancellationToken=default)
     {
-        await RebuildLock.WaitAsync();
+        await RebuildLock.WaitAsync(cancellationToken);
         await StopAsync(CancellationToken.None);
         await StartAsync(CancellationToken.None);
         RebuildLock.Release();

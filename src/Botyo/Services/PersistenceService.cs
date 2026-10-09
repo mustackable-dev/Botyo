@@ -1,33 +1,31 @@
-using System.Data;
-using Cronos;
+using Botyo.Configuration;
 using Botyo.Entities;
-using Botyo.Models;
 using Microsoft.Data.Sqlite;
+using Microsoft.Extensions.Options;
 using Ormamu;
 
 namespace Botyo.Services;
 
-public class PersistenceService()
+public class PersistenceService(IOptions<PersistenceConfig> config)
 {
-    public static string ConnectionString { get; set; } = null!;
-    private static IDbConnection GetConnection()
-        => new SqliteConnection(ConnectionString);
+    private SqliteConnection GetConnection()
+        => new (config.Value.ConnectionString);
 
-    public async Task<Notification> CreateNotification(Notification notification)
+    public async Task<Notification> CreateNotificationAsync(Notification notification)
         => notification with { Id = await GetConnection().InsertAsync(notification) };
 
-    public async Task<Notification> UpdateNotification(Notification notification)
+    public async Task<Notification> UpdateNotificationAsync(Notification notification)
     {
         await GetConnection().UpdateAsync(notification);
         return notification;
     }
 
-    public Task<Notification?> GetNotification(int id)
+    public Task<Notification?> GetNotificationAsync(int id)
         => GetConnection().GetAsync<Notification?>(id);
 
-    public Task<IEnumerable<Notification>> GetNotifications()
+    public Task<IEnumerable<Notification>> GetNotificationsAsync()
         => GetConnection().GetAsync<Notification>();
 
-    public Task DeleteNotification(int id)
+    public Task DeleteNotificationAsync(int id)
         => GetConnection().DeleteAsync<Notification>(id);
 }

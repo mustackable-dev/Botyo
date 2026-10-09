@@ -2,7 +2,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace Botyo.Models;
 
-public record NotificationDto
+public record NotificationCreateRequest
 {
     [Length(1, 9000)]
     public required string Content { get; init; }

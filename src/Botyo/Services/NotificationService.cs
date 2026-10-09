@@ -11,7 +11,7 @@ public class NotificationService(
     WorkerService workerService,
     IDispatchService dispatchService)
 {
-    public async Task<Result<Notification>> CreateNotification(NotificationDto notification)
+    public async Task<Result<Notification>> CreateNotificationAsync(NotificationCreateRequest notification, CancellationToken cancellationToken = default)
     {
         try
         {
@@ -22,21 +22,21 @@ public class NotificationService(
             return Result<Notification>.Failure(StatusCodes.Status400BadRequest, exception);
         }
         
-        Notification persistedNotification = await persistence.CreateNotification(new ()
+        Notification persistedNotification = await persistence.CreateNotificationAsync(new ()
         {
             Active = true,
             Content = notification.Content,
             Cron = notification.Cron
         });
         
-        await workerService.AddScheduledNotification(persistedNotification.ToScheduledNotification());
+        await workerService.AddScheduledNotificationAsync(persistedNotification.ToScheduledNotification(), cancellationToken);
         
         return Result<Notification>.Success(StatusCodes.Status201Created, persistedNotification);
     }
 
-    public async Task<Result<Notification>> GetNotification(int id)
+    public async Task<Result<Notification>> GetNotificationAsync(int id)
     {
-        Notification? notification = await persistence.GetNotification(id);
+        Notification? notification = await persistence.GetNotificationAsync(id);
         
         if(notification is null)
             return Result<Notification>.Failure(
@@ -46,10 +46,10 @@ public class NotificationService(
         return Result<Notification>.Success(StatusCodes.Status200OK, notification);
     }
 
-    public async Task<Result<IEnumerable<Notification>>> GetAllNotifications()
-        => Result<IEnumerable<Notification>>.Success(StatusCodes.Status200OK, await persistence.GetNotifications());
+    public async Task<Result<IEnumerable<Notification>>> GetAllNotificationsAsync()
+        => Result<IEnumerable<Notification>>.Success(StatusCodes.Status200OK, await persistence.GetNotificationsAsync());
     
-    public async Task<Result<Notification>> UpdateNotification(int id, NotificationUpdateDto notificationUpdate)
+    public async Task<Result<Notification>> UpdateNotificationAsync(int id, NotificationUpdateCreateRequest notificationUpdate, CancellationToken cancellationToken = default)
     {
         try
         {
@@ -60,11 +60,11 @@ public class NotificationService(
             return Result<Notification>.Failure(StatusCodes.Status400BadRequest, exception);
         }
         
-        Result<Notification> notification = await GetNotification(id);
+        Result<Notification> notification = await GetNotificationAsync(id);
         if(notification.Error is not null)
             return notification;
         
-        Notification updatedNotification = await persistence.UpdateNotification(new ()
+        Notification updatedNotification = await persistence.UpdateNotificationAsync(new ()
         {
             Id = id,
             Active = notificationUpdate.Active,
@@ -72,44 +72,44 @@ public class NotificationService(
             Cron = notificationUpdate.Cron
         });
         
-        await workerService.ReplaceScheduledNotification(updatedNotification.ToScheduledNotification());
+        await workerService.ReplaceScheduledNotificationAsync(updatedNotification.ToScheduledNotification(), cancellationToken);
         
         return Result<Notification>.Success(StatusCodes.Status200OK, updatedNotification);
     }
 
-    public async Task<Result<bool>> ChangeNotificationStatus(int id, bool active)
+    public async Task<Result<bool>> ChangeNotificationStatusAsync(int id, SetBooleanRequest request, CancellationToken cancellationToken = default)
     {
-        Result<Notification> notification = await GetNotification(id);
+        Result<Notification> notification = await GetNotificationAsync(id);
         if(notification.Error is not null)
             return Result<bool>.Failure(notification.StatusCode, notification.Error);
 
-        Notification updatedNotification = notification.Payload! with { Active = active };
+        Notification updatedNotification = notification.Payload! with { Active = request.Value };
         
-        await persistence.UpdateNotification(updatedNotification);
-        await workerService.ReplaceScheduledNotification(updatedNotification.ToScheduledNotification());
+        await persistence.UpdateNotificationAsync(updatedNotification);
+        await workerService.ReplaceScheduledNotificationAsync(updatedNotification.ToScheduledNotification(), cancellationToken);
         
         return Result<bool>.Success(StatusCodes.Status200OK, true);
     }
 
-    public async Task<Result<bool>> DeleteNotification(int id)
+    public async Task<Result<bool>> DeleteNotificationAsync(int id, CancellationToken cancellationToken = default)
     {
-        Result<Notification> notification = await GetNotification(id);
+        Result<Notification> notification = await GetNotificationAsync(id);
         if(notification.Error is not null)
             return Result<bool>.Failure(notification.StatusCode, notification.Error);
         
-        await persistence.DeleteNotification(id);
-        await workerService.DeleteScheduledNotification(id);
+        await persistence.DeleteNotificationAsync(id);
+        await workerService.DeleteScheduledNotificationAsync(id, cancellationToken);
         
         return Result<bool>.Success(StatusCodes.Status204NoContent, true);
     }
 
-    public async Task<Result<bool>> RunNotificationManually(int id)
+    public async Task<Result<bool>> RunNotificationManuallyAsync(int id, CancellationToken cancellationToken = default)
     {
-        Result<Notification> notification = await GetNotification(id);
+        Result<Notification> notification = await GetNotificationAsync(id);
         if(notification.Error is not null)
             return Result<bool>.Failure(notification.StatusCode, notification.Error);
         
-        await dispatchService.DispatchNotification(notification.Payload!);
+        await dispatchService.DispatchNotificationAsync(notification.Payload!, cancellationToken);
         return Result<bool>.Success(StatusCodes.Status200OK, true);
     }
 }
