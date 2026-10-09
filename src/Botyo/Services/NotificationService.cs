@@ -49,7 +49,7 @@ public class NotificationService(
     public async Task<Result<IEnumerable<Notification>>> GetAllNotificationsAsync()
         => Result<IEnumerable<Notification>>.Success(StatusCodes.Status200OK, await persistence.GetNotificationsAsync());
     
-    public async Task<Result<Notification>> UpdateNotificationAsync(int id, NotificationUpdateCreateRequest notificationUpdate, CancellationToken cancellationToken = default)
+    public async Task<Result<Notification>> UpdateNotificationAsync(int id, NotificationUpdateRequest notificationUpdate, CancellationToken cancellationToken = default)
     {
         try
         {
