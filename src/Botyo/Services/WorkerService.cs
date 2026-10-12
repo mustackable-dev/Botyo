@@ -39,12 +39,12 @@ public class WorkerService : IHostedService
         await ServiceTokenSource.CancelAsync();
         ServiceTask = null;
         foreach (ScheduledNotification notification in Cache.Values)
-                notification.OccurenceQueue.Clear();
+            notification.OccurenceQueue.Clear();
     }
 
     private async Task RunScheduledNotificationsAsync(CancellationToken cancellationToken)
     {
-        DateTimeOffset? earliestNotification = DateTime.UtcNow;
+        DateTimeOffset? earliestNotification = DateTimeOffset.UtcNow;
         do
         {
             DateTimeOffset start = earliestNotification.Value;
@@ -74,7 +74,7 @@ public class WorkerService : IHostedService
                 }
             }
 
-            TimeSpan delay = earliestNotification!.Value - DateTime.UtcNow;
+            TimeSpan delay = earliestNotification!.Value - DateTimeOffset.UtcNow;
 
             _logger.LogInformation(
                 "Worker service delay: {0} ms, will run tasks: {1}",
@@ -149,10 +149,24 @@ public class WorkerService : IHostedService
         DateTimeOffset baseline,
         ScheduledNotification notification)
     {
-        DateTimeOffset? nextOccurence = notification.OccurenceQueue.TryDequeue(out DateTimeOffset result)
-            ? result
-            : CalculateNextOccurence(baseline, notification);
-        
+        DateTimeOffset? nextOccurence;
+        if (notification.OccurenceQueue.TryDequeue(out DateTimeOffset result))
+        {
+            nextOccurence = result;
+        }
+        else
+        {
+            nextOccurence = CalculateNextOccurence(baseline, notification);
+            
+            if (notification.WorkdayOnly &&
+                notification.Schedule.GetPreviousOccurrence(baseline, TimeZoneInfo.Utc) is { } previousBaseline &&
+                CalculateNextOccurence(previousBaseline, notification, true) is { } lastScheduledOccurence &&
+                lastScheduledOccurence > DateTimeOffset.UtcNow)
+            {
+                nextOccurence = lastScheduledOccurence;
+            }
+        }
+
         if (nextOccurence is not null &&
             CalculateNextOccurence(nextOccurence.Value, notification) is { } queuedOccurence)
             notification.OccurenceQueue.Enqueue(queuedOccurence);
@@ -160,9 +174,9 @@ public class WorkerService : IHostedService
         return nextOccurence;
     }
 
-    private static DateTimeOffset? CalculateNextOccurence(DateTimeOffset baseline, ScheduledNotification notification)
+    private static DateTimeOffset? CalculateNextOccurence(DateTimeOffset baseline, ScheduledNotification notification, bool including = false)
     {
-        DateTimeOffset? result = notification.Schedule.GetNextOccurrence(baseline, TimeZoneInfo.Utc);
+        DateTimeOffset? result = notification.Schedule.GetNextOccurrence(baseline, TimeZoneInfo.Utc, including);
         if (!notification.WorkdayOnly || result is null)
             return result;
 
