@@ -6,24 +6,14 @@ using Microsoft.AspNetCore.Mvc;
 namespace Botyo.Controllers;
 
 [Route("Notifications")]
-public class NotificationController(
-    NotificationService notificationService,
-    WorkerService workerService) : BaseController
+public class NotificationController(NotificationService notificationService, WorkerService workerService) : BaseController
 {
     [HttpPost]
     [ProducesResponseType<Notification>(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> CreateNotification(NotificationUpsertRequest notification, CancellationToken cancellationToken = default)
-    {
-        Result<Notification> result = await notificationService.CreateNotificationAsync(notification, cancellationToken);
-
-        if (!workerService.IsRunning())
-        {
-            await workerService.StartAsync(CancellationToken.None);
-        }
-        
-        return FromResult(result);
-    }
+        => FromResult(await notificationService.CreateNotificationAsync(notification, cancellationToken));
+   
     
     [HttpPost("{id:int}/Run")]
     [ProducesResponseType<Notification>(StatusCodes.Status200OK)]
@@ -61,4 +51,10 @@ public class NotificationController(
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> DeleteNotification(int id, CancellationToken cancellationToken=default)
         => FromResult(await notificationService.DeleteNotificationAsync(id, cancellationToken));
+    
+    [HttpGet("schedule")]
+    [ProducesResponseType<Notification>(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public IActionResult GetScheduledNotificationsCache()
+        => Ok(workerService.GetScheduledCache());
 }

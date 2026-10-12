@@ -88,10 +88,11 @@ public class WorkerService : IHostedService
 
             foreach (int notificationId in notificationIdsToRun)
             {
-                if (Cache.TryGetValue(notificationId, out ScheduledNotification? notification))
-                {
-                    _ = dispatchService.DispatchNotificationAsync(notification, cancellationToken);
-                }
+                if (!Cache.TryGetValue(notificationId, out ScheduledNotification? notification))
+                    continue;
+                
+                _ = dispatchService.DispatchNotificationAsync(notification, cancellationToken);
+                notification.OccurenceQueue.Dequeue();
             }
         } while (!cancellationToken.IsCancellationRequested);
     }
@@ -150,7 +151,7 @@ public class WorkerService : IHostedService
         ScheduledNotification notification)
     {
         DateTimeOffset? nextOccurence;
-        if (notification.OccurenceQueue.TryDequeue(out DateTimeOffset result))
+        if (notification.OccurenceQueue.TryPeek(out DateTimeOffset result))
         {
             nextOccurence = result;
         }
@@ -162,27 +163,36 @@ public class WorkerService : IHostedService
                 notification.Schedule.GetPreviousOccurrence(baseline, TimeZoneInfo.Utc) is { } previousBaseline &&
                 CalculateNextOccurence(previousBaseline, notification, true) is { } lastScheduledOccurence &&
                 lastScheduledOccurence > DateTimeOffset.UtcNow)
-            {
                 nextOccurence = lastScheduledOccurence;
-            }
+            
+            notification.OccurenceQueue.Enqueue(nextOccurence.Value);
         }
+        
+        if (notification.OccurenceQueue.Count >= 2)
+            return nextOccurence;
 
-        if (nextOccurence is not null &&
-            CalculateNextOccurence(nextOccurence.Value, notification) is { } queuedOccurence)
+        if (CalculateNextOccurence(nextOccurence.Value, notification) is { } queuedOccurence)
             notification.OccurenceQueue.Enqueue(queuedOccurence);
 
         return nextOccurence;
     }
 
-    private static DateTimeOffset? CalculateNextOccurence(DateTimeOffset baseline, ScheduledNotification notification, bool including = false)
+    private static DateTimeOffset CalculateNextOccurence(DateTimeOffset baseline, ScheduledNotification notification, bool including = false)
     {
         DateTimeOffset? result = notification.Schedule.GetNextOccurrence(baseline, TimeZoneInfo.Utc, including);
-        if (!notification.WorkdayOnly || result is null)
-            return result;
+
+        if (result is null)
+            throw new InvalidDataException("Invalid cron expression");
+        
+        if (!notification.WorkdayOnly)
+            return result.Value;
 
         while (result.Value.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday)
             result = result.Value.AddDays(1);
 
-        return result;
+        return result.Value;
     }
+
+    public Dictionary<int, ScheduledNotification> GetScheduledCache()
+        => Cache.ToDictionary();
 }
